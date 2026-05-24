@@ -7,9 +7,25 @@ try:
 except ModuleNotFoundError:
     sys.exit("This cannot be run without PyTorch installed!\nTry running 'pip3 install torch'")
 
+try:
+    from transformers import DebertaV2Tokenizer
+except ModuleNotFoundError:
+    sys.exit("This cannot be built without Transformers installed!\nTry running 'pip3 install transformers'")
+
+try:
+    import ctypes as c
+except ModuleNotFoundError:
+    sys.exit
+
+try:
+    import sentencepiece as spm
+except ModuleNotFoundError:
+    sys.exit("This cannot be built without SentencePiece installed!\nTry running 'pip3 install sentencepiece'")
+
 import util
 
 if __name__ == "__main__":
-    pass
+    tok = spm.SentencePieceProcessor()
+    tok.load("homebrewModel.model")
 else:
-    sys.exit("This system does not support being run as a module at this time.")
+    sys.exit("This system does not support being run as an importable module at this time.")

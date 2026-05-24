@@ -13,3 +13,6 @@ def flt2arr(val: float) -> int:
         return int((abs(val) / val) * math.trunc(clamp(math.log(abs(val) + 1, 2) * 32, -128, 127)))
     except ZeroDivisionError:
         return int(math.trunc(clamp(math.log(abs(val) + 1, 2) * 32, -128, 127)))
+
+def token_to_data(tok: int):
+    ret =
