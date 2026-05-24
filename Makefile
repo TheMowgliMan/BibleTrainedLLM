@@ -5,7 +5,7 @@ CC :=
 WARNINGS := -fsanitize=undefined -Wall -Werror
 CFLAGS := -O3 -fvect-cost-model=dynamic -march=native $(WARNINGS)
 SOFLAGS := -fPIC -c $(CFLAGS)
-LDFLAGS := -shared -o libai-matrix.so
+LDFLAGS := -shared -fsanitize=undefined -o libai-matrix.so
 
 CC := gcc
 

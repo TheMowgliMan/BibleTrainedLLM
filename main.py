@@ -22,11 +22,29 @@ try:
 except ModuleNotFoundError:
     sys.exit("This cannot be built without SentencePiece installed!\nTry running 'pip3 install sentencepiece'")
 
+def dprint(msg: str):
+    print(f"[ DEBUG ] {msg}")
+
 import util
+import struct
+
+# To make a buffer:
+# size = <size>
+# buf = ctypes.create_string_buffer(<data>, size=size)
+# ...<do stuff>...
+# pba = ctypes.string_at(buf, size=4000)
+# tup = struct.unpack(<format string>, pba)
 
 if __name__ == "__main__":
+    dprint("Loading SentencePiece model...")
     tok = spm.SentencePieceProcessor()
     tok.load("homebrewModel.model")
+
+    dprint("Loading 'libai-matrix.so'...")
+    mtrx = c.CDLL("./libai-matrix.so")
+
+    dprint("Initializing shared libraries...")
+
 
     # encoded = tok.encode("Hello world!", out_type='immutable_proto')
     # for n in encoded.pieces:
@@ -40,9 +58,19 @@ if __name__ == "__main__":
         if inp == "exit":
             break
 
+        rows = [[], [], [], [], [], [], [], []] # Absolute programmergore
+
         encoded = tok.encode(inp, out_type='immutable_proto')
         for n in encoded.pieces:
             data = util.token_to_data(n.id, n.begin)
-            print(data)
+
+            rows[0].append(data[0])
+            rows[1].append(data[1])
+            rows[2].append(data[2])
+            rows[3].append(data[3])
+            rows[4].append(data[4])
+            rows[5].append(data[5])
+            rows[6].append(data[6])
+            rows[7].append(data[7])
 else:
     sys.exit("This system does not support being run as an importable module at this time.")
