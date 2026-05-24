@@ -27,5 +27,22 @@ import util
 if __name__ == "__main__":
     tok = spm.SentencePieceProcessor()
     tok.load("homebrewModel.model")
+
+    # encoded = tok.encode("Hello world!", out_type='immutable_proto')
+    # for n in encoded.pieces:
+    #     data = util.token_to_data(n.id, n.begin)
+    #     print(n.id)
+    #     print(data)
+    #     print(util.data_to_token(data))
+
+    while True:
+        inp = input("?> ")
+        if inp == "exit":
+            break
+
+        encoded = tok.encode(inp, out_type='immutable_proto')
+        for n in encoded.pieces:
+            data = util.token_to_data(n.id, n.begin)
+            print(data)
 else:
     sys.exit("This system does not support being run as an importable module at this time.")
