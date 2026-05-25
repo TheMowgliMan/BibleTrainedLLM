@@ -188,6 +188,7 @@ if __name__ == "__main__":
             row0 = __multiply_matrices(row0, tf)
 
             tns = torch.tensor([util.batch_arr2flt(row0), util.batch_arr2flt(tf), util.batch_arr2flt(rf)])
+            print(tns)
             data = model_network(tns)
             print(data)
 

@@ -20,7 +20,7 @@ def flt2arr(val: float) -> int:
 def batch_arr2flt(list_: list[float]):
     ret = []
     for item in list_:
-        ret.append(flt2arr(item))
+        ret.append(arr2flt(item))
     return ret
 
 def __negativize(n: int):
