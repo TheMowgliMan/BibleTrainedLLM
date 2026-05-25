@@ -187,9 +187,9 @@ if __name__ == "__main__":
             row0 = __multiply_matrices(row0, row1)
             row0 = __multiply_matrices(row0, tf)
 
-            out = row0
-            out.extend(tf)
-            out.extend(rf)
+            out = util.batch_arr2flt(row0)
+            out.extend(util.batch_arr2flt(tf))
+            out.extend(util.batch_arr2flt(rf))
 
             tns = torch.tensor(out)
             print(tns)
