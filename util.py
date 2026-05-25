@@ -1,6 +1,8 @@
 import math
 import random
 
+radius = 16
+
 def clamp(n, smallest, largest): return max(smallest, min(n, largest))
 
 def arr2flt(val: int) -> float:
@@ -15,13 +17,31 @@ def flt2arr(val: float) -> int:
     except ZeroDivisionError:
         return int(math.trunc(clamp(math.log(abs(val) + 1, 2) * 16, -128, 127)))
 
-def token_to_data(tok_id: int, tok_start: int, radius=16):
+def batch_arr2flt(list_: list[float]):
+    ret = []
+    for item in list_:
+        ret.append(flt2arr(item))
+    return ret
+
+def __negativize(n: int):
+    if n > radius:
+        return radius - n
+    else:
+        return n
+
+def __denegativize(n: int):
+    if n < radius:
+        return -1 * n + radius
+    else:
+        return n
+
+def token_to_data(tok_id: int, tok_start: int):
     ret = [0, 0, 0, 0, 0, 0, 0, 0]
 
     # Token encoding
-    ret[0] = tok_id % (2 * radius) - radius
-    ret[1] = math.floor(tok_id / radius / 2) % (2 * radius) - radius
-    ret[2] = math.floor(tok_id / (radius * 2) ** 2) % (2 * radius) - radius
+    ret[0] = __negativize(tok_id % (2 * radius))
+    ret[1] = __negativize(math.floor(tok_id / radius / 2) % (2 * radius))
+    ret[2] = __negativize(math.floor(tok_id / (radius * 2) ** 2) % (2 * radius))
 
     # Positional encodings
     start_floats = (math.sin(tok_start), math.cos(tok_start), math.sin(tok_start / 2007 ** (0.5)), math.cos(tok_start / 2007 ** (0.5)))
@@ -37,8 +57,8 @@ def token_to_data(tok_id: int, tok_start: int, radius=16):
 
     return ret
 
-def data_to_token(tok: list[int], radius=16):
-    ret = tok[0] + radius
-    ret += (tok[1] + radius) * radius * 2
-    ret += (tok[2] + radius) * (radius * 2) ** 2
+def data_to_token(tok: list[int]):
+    ret = __denegativize(tok[0])
+    ret += __denegativize(tok[1]) * radius * 2
+    ret += __denegativize(tok[2]) * (radius * 2) ** 2
     return ret

@@ -28,6 +28,66 @@ def dprint(msg: str):
 import util
 import struct
 
+def __pad(list_, len_):
+    while len(list_) < len_:
+        list_.insert(0, 0)
+
+def __pass_list_as_array(list_, arrsz=2048):
+    zed = [0] * arrsz
+    arr = (c.c_int8 * arrsz)(*zed)
+
+    for i, k in enumerate(list_):
+        arr[i] = k
+
+    return arr
+
+def __pass_array_as_list(arr_, arrsz=2048):
+    zed = [0] * arrsz
+
+    for i in range(arrsz):
+        zed[i] = arr_[i]
+
+    return zed
+
+def __malloc(arrsz):
+    zed = [0] * arrsz
+    arr = (c.c_int8 * arrsz)(*zed)
+    return arr
+
+def __multiply_matrices(list1, list2):
+    buf = __malloc(2048)
+    in1 = __pass_list_as_array(rows[0])
+    in2 = __pass_list_as_array(rows[0])
+
+    mtrx.coladd_different_matrices(buf, in1, in2, 2048, 2048)
+
+    return __pass_array_as_list(buf)
+
+class LanguageModel(nn.Module):
+    def __init__(self, size):
+        super().__init__()
+        self.size = int(size * 3)
+        self.flatten = nn.Flatten()
+
+        halfsize = int(self.size / 2)
+        thirdsize = int(self.size / 3)
+
+        self.stack = nn.Sequential(nn.Linear(self.size, halfsize),
+                                   nn.Tanhshrink(),
+                                   nn.Linear(halfsize, thirdsize),
+                                   nn.Tanh(),
+                                   nn.Linear(thirdsize, thirdsize),
+                                   nn.Tanhshrink(),
+                                   nn.Linear(thirdsize, 1768),
+                                   nn.Tanh(),
+                                   nn.Linear(1768, 8),
+                                   nn.Tanhshrink())
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.stack(x)
+        return logits
+
 # To make a buffer:
 # size = <size>
 # buf = ctypes.create_string_buffer(<data>, size=size)
@@ -44,7 +104,14 @@ if __name__ == "__main__":
     mtrx = c.CDLL("./libai-matrix.so")
 
     dprint("Initializing shared libraries...")
+    mtrx.coladd_different_matrices.argtypes = c.POINTER(c.c_int8),c.POINTER(c.c_int8),c.POINTER(c.c_int8),c.c_uint64,c.c_uint64
+    mtrx.coladd_different_matrices.restypes = None
 
+    dprint("Creating model...")
+    device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+    dprint(f"Using device {device}!")
+
+    model_network = LanguageModel(2048).to(device)
 
     # encoded = tok.encode("Hello world!", out_type='immutable_proto')
     # for n in encoded.pieces:
@@ -63,6 +130,7 @@ if __name__ == "__main__":
         encoded = tok.encode(inp, out_type='immutable_proto')
         for n in encoded.pieces:
             data = util.token_to_data(n.id, n.begin)
+            # print(data)
 
             rows[0].append(data[0])
             rows[1].append(data[1])
@@ -72,5 +140,68 @@ if __name__ == "__main__":
             rows[5].append(data[5])
             rows[6].append(data[6])
             rows[7].append(data[7])
+
+        for i in range(256):
+            if len(rows[0]) > 2048:
+                del rows[0][0 : (len(rows[0]) - 2048)]
+                del rows[1][0 : (len(rows[1]) - 2048)]
+                del rows[2][0 : (len(rows[2]) - 2048)]
+                del rows[3][0 : (len(rows[3]) - 2048)]
+                del rows[4][0 : (len(rows[4]) - 2048)]
+                del rows[5][0 : (len(rows[5]) - 2048)]
+                del rows[6][0 : (len(rows[6]) - 2048)]
+                del rows[7][0 : (len(rows[7]) - 2048)]
+            elif len(rows[0]) < 2048:
+                __pad(rows[0], 2048)
+                __pad(rows[1], 2048)
+                __pad(rows[2], 2048)
+                __pad(rows[3], 2048)
+                __pad(rows[4], 2048)
+                __pad(rows[5], 2048)
+                __pad(rows[6], 2048)
+                __pad(rows[7], 2048)
+
+            row0 = __multiply_matrices(rows[0], rows[0])
+            row1 = __multiply_matrices(rows[1], rows[1])
+            row2 = __multiply_matrices(rows[2], rows[2])
+            row3 = __multiply_matrices(rows[3], rows[3])
+
+            r1 = __multiply_matrices(row0, row2)
+            r2 = __multiply_matrices(row1, row3)
+            rf = __multiply_matrices(r1, r2)
+
+            t0 = __multiply_matrices(rows[4], rows[6])
+            t1 = __multiply_matrices(rows[5], rows[7])
+            tf = __multiply_matrices(t0, t1)
+
+            row0 = __multiply_matrices(row0, rows[4])
+            row1 = __multiply_matrices(row1, rows[5])
+            row2 = __multiply_matrices(row2, rows[6])
+            row3 = __multiply_matrices(row3, rows[7])
+
+            row0 = __multiply_matrices(row0, row2)
+            row1 = __multiply_matrices(row1, row3)
+            row0 = __multiply_matrices(row0, t0)
+            row1 = __multiply_matrices(row1, t1)
+
+            row0 = __multiply_matrices(row0, row1)
+            row0 = __multiply_matrices(row0, tf)
+
+            tns = torch.tensor([util.batch_arr2flt(row0), util.batch_arr2flt(tf), util.batch_arr2flt(rf)])
+            data = model_network(tns)
+            print(data)
+
+            #print(tok.decode()[0], end="")
+
+            rows[0].append(data[0])
+            rows[1].append(data[1])
+            rows[2].append(data[2])
+            rows[3].append(data[3])
+            rows[4].append(data[4])
+            rows[5].append(data[5])
+            rows[6].append(data[6])
+            rows[7].append(data[7])
+
+        print(" ")
 else:
     sys.exit("This system does not support being run as an importable module at this time.")
