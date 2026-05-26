@@ -57,6 +57,13 @@ def token_to_data(tok_id: int, tok_start: int):
 
     return ret
 
+def fdata_to_token(tok: list[float]):
+    proc = []
+    for item in tok:
+        proc.append(flt2arr(item))
+
+    return data_to_token(proc)
+
 def data_to_token(tok: list[int]):
     ret = __denegativize(tok[0])
     ret += __denegativize(tok[1]) * radius * 2
