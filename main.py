@@ -56,14 +56,14 @@ def __malloc(arrsz):
 
 def __multiply_matrices(list1, list2):
     buf = __malloc(2048)
-    in1 = __pass_list_as_array(rows[0])
-    in2 = __pass_list_as_array(rows[0])
+    in1 = __pass_list_as_array(list1)
+    in2 = __pass_list_as_array(list2)
 
     mtrx.coladd_different_matrices(buf, in1, in2, 2048, 2048)
 
     return __pass_array_as_list(buf)
 
-def __run_model_step(rows: list):
+def __converge(rows):
     row0 = __multiply_matrices(rows[0], rows[0])
     row1 = __multiply_matrices(rows[1], rows[1])
     row2 = __multiply_matrices(rows[2], rows[2])
@@ -77,25 +77,19 @@ def __run_model_step(rows: list):
     t1 = __multiply_matrices(rows[5], rows[7])
     tf = __multiply_matrices(t0, t1)
 
-    row0 = __multiply_matrices(row0, rows[4])
-    row1 = __multiply_matrices(row1, rows[5])
-    row2 = __multiply_matrices(row2, rows[6])
-    row3 = __multiply_matrices(row3, rows[7])
-
-    row0 = __multiply_matrices(row0, row2)
-    row1 = __multiply_matrices(row1, row3)
-    row0 = __multiply_matrices(row0, t0)
-    row1 = __multiply_matrices(row1, t1)
-
-    row0 = __multiply_matrices(row0, row1)
-    row0 = __multiply_matrices(row0, tf)
+    row0 = __multiply_matrices(rf, tf)
 
     out = util.batch_arr2flt(row0)
     out.extend(util.batch_arr2flt(tf))
     out.extend(util.batch_arr2flt(rf))
 
+    return out
+
+def __run_model_step(rows: list, model):
+    out = __converge(rows)
     tns = torch.tensor(out)
-    data = model_network(tns)
+    model.eval()
+    data = model(tns)
 
     return data.tolist()
 
@@ -131,6 +125,93 @@ def __rows_push(rows, outdata):
     rows[6].append(util.flt2arr(outdata[6]))
     rows[7].append(util.flt2arr(outdata[7]))
     return rows
+
+class DummyToken:
+    id = 3
+    begin = 0
+
+def __train_loop(model, spm, loss_fn, optimizer, data_fname, bs, e):
+    with open(data_fname) as data:
+        model.train()
+        batch = 0
+        for i, line in enumerate(data.readlines()):
+            if line.strip() != "":
+                rows = [[], [], [], [], [], [], [], []]
+                encoded = spm.encode(line, out_type='immutable_proto')
+
+                n = encoded.pieces[0]
+                data = util.token_to_data(n.id, n.begin)
+
+                rows[0].append(data[0])
+                rows[1].append(data[1])
+                rows[2].append(data[2])
+                rows[3].append(data[3])
+                rows[4].append(data[4])
+                rows[5].append(data[5])
+                rows[6].append(data[6])
+                rows[7].append(data[7])
+
+                for k in range(len(encoded.pieces)):
+                    target = 0
+                    if k + 1 == len(encoded.pieces):
+                        target = DummyToken()
+                    else:
+                        target = encoded.pieces[k + 1]
+                        # print(target.piece)
+
+                    target = torch.tensor(util.batch_arr2flt(util.token_to_data(target.id, target.begin)))
+
+                    rows = __rowclean(rows)
+                    matrix = __converge(rows)
+                    tns = torch.tensor(matrix, requires_grad=True)
+
+                    data = model(tns)
+                    loss = loss_fn(data, target)
+
+                    loss.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                    if k % 100 == 0:
+                        loss = loss.item()
+                        print(f"loss: {loss:>7f}")
+
+                batch += 1
+
+            if batch % 8 == 0:
+                model.eval()
+                input_string = "In the beginning"
+
+                rows = [[], [], [], [], [], [], [], []]
+                speaking_tokens = []
+
+                encoded = spm.encode(input_string, out_type='immutable_proto')
+                for n in encoded.pieces:
+                    data = util.token_to_data(n.id, n.begin)
+
+                    rows[0].append(data[0])
+                    rows[1].append(data[1])
+                    rows[2].append(data[2])
+                    rows[3].append(data[3])
+                    rows[4].append(data[4])
+                    rows[5].append(data[5])
+                    rows[6].append(data[6])
+                    rows[7].append(data[7])
+
+                for i in range(16):
+                    rows = __rowclean(rows)
+
+                    outdata = __run_model_step(rows, model_network)
+                    speaking_tokens.append(util.fdata_to_token(outdata) % 4096)
+
+                    rows == __rows_push(rows, outdata)
+
+                decoded = smp.decode(speaking_tokens)
+                print(f"Test at batch {batch} with input '{input_string}': '{decoded}'")
+
+                model.train()
+            if batch > bs:
+                break
 
 class LanguageModel(nn.Module):
     def __init__(self, size):
@@ -182,6 +263,15 @@ if __name__ == "__main__":
 
     model_network = LanguageModel(2048).to(device)
 
+    learning_rate = 0.42
+    batch_size = 64
+    epochs = 1
+    dprint(f"Setting training hyperparameters: learning_rate {learning_rate}, batch_size {batch_size}, epochs {epochs}")
+
+    dprint("Initializing training system...")
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = torch.optim.RAdam(model_network.parameters(), lr=learning_rate)
+
     # encoded = tok.encode("Hello world!", out_type='immutable_proto')
     # for n in encoded.pieces:
     #     data = util.token_to_data(n.id, n.begin)
@@ -193,32 +283,34 @@ if __name__ == "__main__":
         inp = input("?> ")
         if inp == "exit":
             break
+        elif inp == "train":
+            __train_loop(model_network, tok, loss_fn, optimizer, "training-data/test-vocabulary.txt", batch_size, epochs)
+        else:
+            rows = [[], [], [], [], [], [], [], []] # Absolute programmergore
+            speaking_tokens = []
 
-        rows = [[], [], [], [], [], [], [], []] # Absolute programmergore
-        speaking_tokens = []
+            encoded = tok.encode(inp, out_type='immutable_proto')
+            for n in encoded.pieces:
+                data = util.token_to_data(n.id, n.begin)
+                # print(data)
 
-        encoded = tok.encode(inp, out_type='immutable_proto')
-        for n in encoded.pieces:
-            data = util.token_to_data(n.id, n.begin)
-            # print(data)
+                rows[0].append(data[0])
+                rows[1].append(data[1])
+                rows[2].append(data[2])
+                rows[3].append(data[3])
+                rows[4].append(data[4])
+                rows[5].append(data[5])
+                rows[6].append(data[6])
+                rows[7].append(data[7])
 
-            rows[0].append(data[0])
-            rows[1].append(data[1])
-            rows[2].append(data[2])
-            rows[3].append(data[3])
-            rows[4].append(data[4])
-            rows[5].append(data[5])
-            rows[6].append(data[6])
-            rows[7].append(data[7])
+            for i in range(256):
+                rows = __rowclean(rows)
 
-        for i in range(256):
-            rows = __rowclean(rows)
+                outdata = __run_model_step(rows, model_network)
+                speaking_tokens.append(util.fdata_to_token(outdata) % 4096)
 
-            outdata = __run_model_step(rows)
-            speaking_tokens.append(util.fdata_to_token(outdata) % 4096)
+                rows == __rows_push(rows, outdata)
 
-            rows == __rows_push(rows, outdata)
-
-        print(tok.decode(speaking_tokens))
+            print(tok.decode(speaking_tokens))
 else:
     sys.exit("This system does not support being run as an importable module at this time.")
