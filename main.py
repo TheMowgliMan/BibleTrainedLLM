@@ -136,45 +136,46 @@ def __train_loop(model, spm, loss_fn, optimizer, data_fname, bs, e):
         batch = 0
         for i, line in enumerate(data.readlines()):
             if line.strip() != "":
-                rows = [[], [], [], [], [], [], [], []]
-                encoded = spm.encode(line, out_type='immutable_proto')
+                for i in range(16):
+                    rows = [[], [], [], [], [], [], [], []]
+                    encoded = spm.encode(line, out_type='immutable_proto')
 
-                n = encoded.pieces[0]
-                data = util.token_to_data(n.id, n.begin)
+                    n = encoded.pieces[0]
+                    data = util.token_to_data(n.id, n.begin)
 
-                rows[0].append(data[0])
-                rows[1].append(data[1])
-                rows[2].append(data[2])
-                rows[3].append(data[3])
-                rows[4].append(data[4])
-                rows[5].append(data[5])
-                rows[6].append(data[6])
-                rows[7].append(data[7])
+                    rows[0].append(data[0])
+                    rows[1].append(data[1])
+                    rows[2].append(data[2])
+                    rows[3].append(data[3])
+                    rows[4].append(data[4])
+                    rows[5].append(data[5])
+                    rows[6].append(data[6])
+                    rows[7].append(data[7])
 
-                for k in range(len(encoded.pieces)):
-                    target = 0
-                    if k + 1 == len(encoded.pieces):
-                        target = DummyToken()
-                    else:
-                        target = encoded.pieces[k + 1]
-                        # print(target.piece)
+                    for k in range(len(encoded.pieces)):
+                        target = 0
+                        if k + 1 == len(encoded.pieces):
+                            target = DummyToken()
+                        else:
+                            target = encoded.pieces[k + 1]
+                            # print(target.piece)
 
-                    target = torch.tensor(util.batch_arr2flt(util.token_to_data(target.id, target.begin)))
+                        target = torch.tensor(util.batch_arr2flt(util.token_to_data(target.id, target.begin)))
 
-                    rows = __rowclean(rows)
-                    matrix = __converge(rows)
-                    tns = torch.tensor(matrix, requires_grad=True)
+                        rows = __rowclean(rows)
+                        matrix = __converge(rows)
+                        tns = torch.tensor(matrix, requires_grad=True)
 
-                    data = model(tns)
-                    loss = loss_fn(data, target)
+                        data = model(tns)
+                        loss = loss_fn(data, target)
 
-                    loss.backward()
-                    optimizer.step()
-                    optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                        optimizer.zero_grad()
 
-                    if k % 100 == 0:
-                        loss = loss.item()
-                        print(f"loss: {loss:>7f}")
+                        if k % 100 == 0:
+                            loss = loss.item()
+                            print(f"loss: {loss:>7f}")
 
                 batch += 1
 
@@ -263,14 +264,14 @@ if __name__ == "__main__":
 
     model_network = LanguageModel(2048).to(device)
 
-    learning_rate = 0.42
-    batch_size = 1024
+    learning_rate = 0.01
+    batch_size = 2048
     epochs = 1
     dprint(f"Setting training hyperparameters: learning_rate {learning_rate}, batch_size {batch_size}, epochs {epochs}")
 
     dprint("Initializing training system...")
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.RAdam(model_network.parameters(), lr=learning_rate)
+    optimizer = torch.optim.SGD(model_network.parameters(), lr=learning_rate)
 
     # encoded = tok.encode("Hello world!", out_type='immutable_proto')
     # for n in encoded.pieces:
