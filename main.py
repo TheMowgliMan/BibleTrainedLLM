@@ -178,7 +178,7 @@ def __train_loop(model, spm, loss_fn, optimizer, data_fname, bs, e):
 
                 batch += 1
 
-            if batch % 8 == 0:
+            if batch % 4 == 0:
                 model.eval()
                 input_string = "In the beginning"
 
@@ -206,7 +206,7 @@ def __train_loop(model, spm, loss_fn, optimizer, data_fname, bs, e):
 
                     rows == __rows_push(rows, outdata)
 
-                decoded = smp.decode(speaking_tokens)
+                decoded = spm.decode(speaking_tokens)
                 print(f"Test at batch {batch} with input '{input_string}': '{decoded}'")
 
                 model.train()
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     model_network = LanguageModel(2048).to(device)
 
     learning_rate = 0.42
-    batch_size = 64
+    batch_size = 1024
     epochs = 1
     dprint(f"Setting training hyperparameters: learning_rate {learning_rate}, batch_size {batch_size}, epochs {epochs}")
 
